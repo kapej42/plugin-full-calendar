@@ -360,8 +360,26 @@ export function toEventInput(
       ? DateTime.fromISO(fm.startDate, { zone: sourceZone })
       : DateTime.fromISO(dtstartStr!, { zone: sourceZone });
 
+    // Validate that the source date is valid
+    if (!dtInSource.isValid) {
+      console.error(
+        `Invalid start date for rrule event "${frontmatter.title}": ${dtInSource.invalidReason}`,
+        { startDate: fm.startDate, startTime: fm.startTime, sourceZone }
+      );
+      return null;
+    }
+
     // Convert to display timezone to get the correct display time
     const dtInDisplay = dtInSource.setZone(displayZone);
+
+    // Validate that the display date is valid
+    if (!dtInDisplay.isValid) {
+      console.error(
+        `Invalid date after timezone conversion for rrule event "${frontmatter.title}": ${dtInDisplay.invalidReason}`,
+        { sourceZone, displayZone }
+      );
+      return null;
+    }
 
     // Calculate the day offset: how many days the date shifts when converting timezones
     // This is CRITICAL for cross-timezone events that cross day boundaries
@@ -415,12 +433,53 @@ export function toEventInput(
 
     // Construct exdates - these need to be in "fake UTC" format where the local time
     // in the display timezone is stored in UTC components (matching the monkeypatch behavior)
-    const exdate = fm.skipDates
+    // For all-day events, skip dates are just dates without times
+    const exdate = (fm.skipDates || [])
+      .filter((d: string) => d && d.trim() !== '') // Filter out empty/invalid dates
       .map((d: string) => {
-        // Parse the skip date with the event's start time in the source timezone
+        // For all-day events, skip dates don't have times
+        if (frontmatter.allDay) {
+          const exDate = DateTime.fromISO(d, { zone: displayZone });
+          if (!exDate.isValid) {
+            console.warn(`Invalid skip date "${d}" for all-day event: ${exDate.invalidReason}`);
+            return null;
+          }
+          // For all-day events, use midnight in the display timezone
+          const fakeUtc = new Date(Date.UTC(exDate.year, exDate.month - 1, exDate.day, 0, 0, 0, 0));
+          if (isNaN(fakeUtc.getTime())) {
+            console.warn(`Invalid Date object created from all-day skip date "${d}"`);
+            return null;
+          }
+          return fakeUtc.toISOString();
+        }
+
+        // For timed events, parse the skip date with the event's start time
+        if (!fm.startTime) {
+          console.warn(`Missing startTime for timed event skip date "${d}"`);
+          return null;
+        }
+
         const exInSource = DateTime.fromISO(`${d}T${fm.startTime}`, { zone: sourceZone });
+
+        // Validate that the source date is valid
+        if (!exInSource.isValid) {
+          console.warn(
+            `Invalid skip date "${d}" with start time "${fm.startTime}" in timezone "${sourceZone}": ${exInSource.invalidReason}`
+          );
+          return null;
+        }
+
         // Convert to display timezone to get the local time
         const exInDisplay = exInSource.setZone(displayZone);
+
+        // Validate that the display date is valid
+        if (!exInDisplay.isValid) {
+          console.warn(
+            `Invalid date after timezone conversion from "${sourceZone}" to "${displayZone}": ${exInDisplay.invalidReason}`
+          );
+          return null;
+        }
+
         // Create a "fake UTC" date where the local time is stored in UTC components
         // This matches how the monkeypatch stores times for FullCalendar
         const fakeUtc = new Date(
@@ -434,6 +493,15 @@ export function toEventInput(
             exInDisplay.millisecond
           )
         );
+
+        // Validate that the resulting Date is valid before calling toISOString()
+        if (isNaN(fakeUtc.getTime())) {
+          console.warn(
+            `Invalid Date object created from skip date "${d}" with components: year=${exInDisplay.year}, month=${exInDisplay.month}, day=${exInDisplay.day}`
+          );
+          return null;
+        }
+
         return fakeUtc.toISOString();
       })
       .flatMap((d: string | null) => (d ? [d] : []));

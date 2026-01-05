@@ -19,17 +19,102 @@ import ical from 'ical.js';
 import { OFCEvent, validateEvent } from '../../types';
 
 /**
+ * Maps Windows timezone identifiers to IANA timezone identifiers.
+ * Some ICS files (especially from Outlook/Exchange) use Windows timezone names
+ * instead of IANA identifiers, which Luxon requires.
+ */
+function mapWindowsTimezoneToIANA(windowsTz: string): string | null {
+  const windowsToIANA: Record<string, string> = {
+    // Western Europe
+    'W. Europe Standard Time': 'Europe/Berlin',
+    'Central Europe Standard Time': 'Europe/Budapest',
+    'E. Europe Standard Time': 'Europe/Bucharest',
+    'Russian Standard Time': 'Europe/Moscow',
+    'GMT Standard Time': 'Europe/London',
+    'Greenwich Standard Time': 'Europe/London',
+    // Americas
+    'Eastern Standard Time': 'America/New_York',
+    'Central Standard Time': 'America/Chicago',
+    'Mountain Standard Time': 'America/Denver',
+    'Pacific Standard Time': 'America/Los_Angeles',
+    'Alaskan Standard Time': 'America/Anchorage',
+    'Hawaiian Standard Time': 'Pacific/Honolulu',
+    'Atlantic Standard Time': 'America/Halifax',
+    'Central America Standard Time': 'America/Guatemala',
+    'Mexico Standard Time': 'America/Mexico_City',
+    'SA Pacific Standard Time': 'America/Bogota',
+    'SA Western Standard Time': 'America/Caracas',
+    'SA Eastern Standard Time': 'America/Sao_Paulo',
+    'Pacific SA Standard Time': 'America/Santiago',
+    // Asia
+    'Tokyo Standard Time': 'Asia/Tokyo',
+    'Korea Standard Time': 'Asia/Seoul',
+    'China Standard Time': 'Asia/Shanghai',
+    'India Standard Time': 'Asia/Kolkata',
+    'Singapore Standard Time': 'Asia/Singapore',
+    'W. Australia Standard Time': 'Australia/Perth',
+    'AUS Eastern Standard Time': 'Australia/Sydney',
+    'New Zealand Standard Time': 'Pacific/Auckland',
+    // Middle East
+    'Arab Standard Time': 'Asia/Riyadh',
+    'Israel Standard Time': 'Asia/Jerusalem',
+    'Turkey Standard Time': 'Europe/Istanbul',
+    // Africa
+    'South Africa Standard Time': 'Africa/Johannesburg',
+    'Egypt Standard Time': 'Africa/Cairo',
+  };
+
+  return windowsToIANA[windowsTz] || null;
+}
+
+/**
+ * Normalizes a timezone identifier to an IANA timezone identifier.
+ * Handles UTC ('Z'), Windows timezone identifiers, and IANA identifiers.
+ */
+function normalizeTimezone(zone: string | undefined | null): string {
+  // Handle undefined, null, or empty strings
+  if (!zone || zone.trim() === '') {
+    return 'utc';
+  }
+
+  // Handle UTC
+  if (zone === 'Z' || zone.toLowerCase() === 'utc') {
+    return 'utc';
+  }
+
+  // Check if it's already a valid IANA timezone
+  try {
+    const testDt = DateTime.now().setZone(zone);
+    if (testDt.isValid) {
+      return zone;
+    }
+  } catch {
+    // Not a valid IANA timezone, continue to Windows mapping
+  }
+
+  // Try to map Windows timezone to IANA
+  const mapped = mapWindowsTimezoneToIANA(zone);
+  if (mapped) {
+    return mapped;
+  }
+
+  // Return original if no mapping found (will be handled by caller)
+  return zone;
+}
+
+/**
  * Converts an ical.js Time object into a Luxon DateTime object.
  * This version uses .toJSDate() to get a baseline moment in time and then
  * applies the original timezone from the iCal data.
+ * Handles Windows timezone identifiers by mapping them to IANA identifiers.
  */
 function icalTimeToLuxon(t: ical.Time): DateTime {
   const jsDate = t.toJSDate();
   // The timezone property on ical.Time is what we need.
-  // It can be 'Z' for UTC or an IANA identifier like 'Asia/Kolkata'.
-  // We use setZone to ensure the DateTime object has the correct zone,
-  // without changing the underlying moment in time.
-  const zone = t.timezone === 'Z' ? 'utc' : t.timezone;
+  // It can be 'Z' for UTC, a Windows identifier like 'W. Europe Standard Time',
+  // an IANA identifier like 'Asia/Kolkata', or undefined/null.
+  const rawZone = t.timezone === 'Z' ? 'utc' : t.timezone || undefined;
+  const zone = normalizeTimezone(rawZone);
 
   // Attempt to set the zone from the ICS file.
   const zonedDt = DateTime.fromJSDate(jsDate).setZone(zone);
@@ -38,9 +123,16 @@ function icalTimeToLuxon(t: ical.Time): DateTime {
   // If so, fall back to UTC, which is the old behavior.
   if (!zonedDt.isValid) {
     console.warn(
-      `Full Calendar ICS Parser: Invalid timezone identifier "${zone}". Falling back to UTC.`
+      `Full Calendar ICS Parser: Invalid timezone identifier "${rawZone}". Falling back to UTC.`
     );
     return DateTime.fromJSDate(jsDate, { zone: 'utc' });
+  }
+
+  // Log if we had to map a Windows timezone
+  if (rawZone !== zone && rawZone !== 'utc') {
+    console.log(
+      `Full Calendar ICS Parser: Mapped Windows timezone "${rawZone}" to IANA timezone "${zone}".`
+    );
   }
 
   return zonedDt;

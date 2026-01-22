@@ -475,12 +475,12 @@ export class AvailabilityService {
   }
 
   /**
-   * Format time string (HH:mm) to readable format (h:mm AM/PM)
+   * Format time string (HH:mm) to 24-hour format (HH:mm)
    */
   private formatTime(timeStr: string): string {
     const [hours, minutes] = timeStr.split(':').map(Number);
     const date = DateTime.fromObject({ hour: hours, minute: minutes });
-    return date.toFormat('h:mm a');
+    return date.toFormat('HH:mm');
   }
 
   /**

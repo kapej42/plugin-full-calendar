@@ -252,13 +252,33 @@ export default class FullCalendarPlugin extends Plugin {
           // Calculate availability from tomorrow (today and past dates are irrelevant)
           const now = DateTime.local();
           const startDate = now.plus({ days: 1 }).startOf('day').toJSDate(); // Tomorrow
-          const endDate = now.plus({ days: 14 }).endOf('day').toJSDate(); // 2 weeks from tomorrow
+          const endDate = now.plus({ years: 1 }).endOf('day').toJSDate(); // 1 year from tomorrow
 
           // Get all event sources (for command, we use all sources, not filtered by workspace)
           const allSources = this.cache.getAllEvents();
 
+          // Get active workspace name
+          const { WorkspaceManager } = await import('./features/workspaces/WorkspaceManager');
+          const workspaceManager = new WorkspaceManager(this.settings);
+          const activeWorkspace = workspaceManager.getActiveWorkspace();
+          const workspaceName = activeWorkspace?.name || null;
+
+          // Get calendar names from sources
+          const calendarNames = allSources
+            .map(source => {
+              const calendarInfo = this.providerRegistry.getSource(source.id);
+              return calendarInfo?.name || source.id;
+            })
+            .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
+
           // Generate and save availability
-          const filePath = await service.generateAndSaveAvailability(allSources, startDate, endDate);
+          const filePath = await service.generateAndSaveAvailability(
+            allSources,
+            startDate,
+            endDate,
+            workspaceName,
+            calendarNames
+          );
 
           new Notice(`Availability saved to ${filePath}`);
         } catch (err) {

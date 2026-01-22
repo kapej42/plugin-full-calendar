@@ -259,13 +259,12 @@ export function renderAppearanceSettings(
     });
 
   // Availability sharing section
-  new Setting(containerEl).setName('Share Availability').setHeading();
+  new Setting(containerEl).setName('Share availability').setHeading();
 
-  const availabilityDesc = containerEl.createDiv();
-  availabilityDesc.createEl('p', {
-    text: 'Anonymize and share your availability for the next two weeks. Useful with copilot or AI agents to quickly schedule meetings without manually finding time slots.'
-  });
-  availabilityDesc.style.marginBottom = '1em';
+  new Setting(containerEl)
+    .setName('')
+    .setDesc('Anonymize and share your availability for the next year. Useful with copilot or AI agents to quickly schedule meetings without manually finding time slots.')
+    .settingEl.addClass('fc-indented-setting');
 
   new Setting(containerEl)
     .setName('Availability Files Folder')

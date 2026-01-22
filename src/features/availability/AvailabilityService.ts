@@ -412,7 +412,9 @@ export class AvailabilityService {
   generateAvailabilityMarkdown(
     slots: TimeSlot[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    workspaceName: string | null = null,
+    calendarNames: string[] = []
   ): string {
     const start = DateTime.fromJSDate(startDate);
     const end = DateTime.fromJSDate(endDate);
@@ -420,7 +422,15 @@ export class AvailabilityService {
     const lines: string[] = [];
     lines.push(`# Availability: ${start.toFormat('MMMM d')} - ${end.toFormat('MMMM d, yyyy')}`);
     lines.push('');
-
+    
+    // Add view/workspace information
+    if (workspaceName) {
+      lines.push(`This is an anonimized availability overview for workspace **${workspaceName}**`);
+      lines.push('');
+    }
+    
+    lines.push('---');
+    
     // Group slots by date
     const slotsByDate = new Map<string, TimeSlot[]>();
     for (const slot of slots) {
@@ -500,7 +510,7 @@ export class AvailabilityService {
 
     const startDateStr = start.toFormat('yyyy-MM-dd');
     const endDateStr = end.toFormat('yyyy-MM-dd');
-    const filename = `${startDateStr}-availability-${startDateStr}-to-${endDateStr}.md`;
+    const filename = `${startDateStr}-availability-overview.md`;
     const filePath = `${folderPath}/${filename}`;
 
     // Check if file exists, append number if needed
@@ -522,7 +532,9 @@ export class AvailabilityService {
   async generateAndSaveAvailability(
     sources: OFCEventSource[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    workspaceName: string | null = null,
+    calendarNames: string[] = []
   ): Promise<string> {
     // Get events in range
     const events = this.getEventsInDateRange(sources, startDate, endDate);
@@ -536,7 +548,13 @@ export class AvailabilityService {
     const availableSlots = this.calculateAvailableSlots(anonymizedEvents, startDate, endDate);
 
     // Generate markdown
-    const markdown = this.generateAvailabilityMarkdown(availableSlots, startDate, endDate);
+    const markdown = this.generateAvailabilityMarkdown(
+      availableSlots,
+      startDate,
+      endDate,
+      workspaceName,
+      calendarNames
+    );
 
     // Save file
     const filePath = await this.saveAvailabilityFile(markdown, startDate, endDate);

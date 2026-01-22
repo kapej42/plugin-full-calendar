@@ -623,17 +623,31 @@ export class CalendarView extends ItemView {
               // Calculate availability from tomorrow (today and past dates are irrelevant)
               const now = DateTime.local();
               const startDate = now.plus({ days: 1 }).startOf('day').toJSDate(); // Tomorrow
-              const endDate = now.plus({ days: 14 }).endOf('day').toJSDate(); // 2 weeks from tomorrow
+              const endDate = now.plus({ years: 1 }).endOf('day').toJSDate(); // 1 year from tomorrow
 
               // Get filtered event sources (respects workspace filtering)
               const allSources = this.plugin.cache.getAllEvents();
               const sources = this.viewEnhancer?.getFilteredSources(allSources) || allSources;
 
+              // Get workspace name
+              const activeWorkspace = this.viewEnhancer?.getActiveWorkspace();
+              const workspaceName = activeWorkspace?.name || null;
+
+              // Get calendar names from sources
+              const calendarNames = sources
+                .map(source => {
+                  const calendarInfo = this.plugin.providerRegistry.getSource(source.id);
+                  return calendarInfo?.name || source.id;
+                })
+                .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
+
               // Generate and save availability
               const filePath = await service.generateAndSaveAvailability(
                 sources,
                 startDate,
-                endDate
+                endDate,
+                workspaceName,
+                calendarNames
               );
 
               new Notice(`Availability saved to ${filePath}`);

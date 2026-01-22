@@ -5,7 +5,8 @@
     "revalidateRemote": "Revalidate remote calendars",
     "openCalendar": "Open Calendar",
     "openChronoAnalyser": "Open Chrono Analyser (Desktop Only)",
-    "openSidebar": "Open in sidebar"
+    "openSidebar": "Open in sidebar",
+    "shareAvailability": "Share your availability"
   },
   "notices": {
     "settingsUpdated": "Full Calendar has updated your calendar settings to a new format.",

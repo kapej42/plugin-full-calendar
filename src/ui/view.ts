@@ -610,6 +610,38 @@ export class CalendarView extends ItemView {
               new Notice('Failed to open Chrono Analyser. Please check the console.');
             }
           }
+        },
+        shareAvailability: {
+          text: 'Share Availability',
+          click: async () => {
+            try {
+              const { AvailabilityService } = await import(
+                '../features/availability/AvailabilityService'
+              );
+              const service = new AvailabilityService(this.plugin.app, this.plugin.settings);
+
+              // Calculate availability from tomorrow (today and past dates are irrelevant)
+              const now = DateTime.local();
+              const startDate = now.plus({ days: 1 }).startOf('day').toJSDate(); // Tomorrow
+              const endDate = now.plus({ days: 14 }).endOf('day').toJSDate(); // 2 weeks from tomorrow
+
+              // Get filtered event sources (respects workspace filtering)
+              const allSources = this.plugin.cache.getAllEvents();
+              const sources = this.viewEnhancer?.getFilteredSources(allSources) || allSources;
+
+              // Generate and save availability
+              const filePath = await service.generateAndSaveAvailability(
+                sources,
+                startDate,
+                endDate
+              );
+
+              new Notice(`Availability saved to ${filePath}`);
+            } catch (err) {
+              console.error('Full Calendar: Failed to generate availability', err);
+              new Notice('Failed to generate availability. Please check the console.');
+            }
+          }
         }
       },
       eventClick: async info => {

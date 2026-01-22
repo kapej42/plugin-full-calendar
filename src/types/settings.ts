@@ -81,6 +81,9 @@ export interface FullCalendarSettings {
   weekends?: boolean; // Whether to display weekends
   hiddenDays?: number[]; // Array of day numbers to hide (0=Sunday, 1=Monday, etc.)
   dayMaxEvents?: number | boolean; // Max events per day in month view (true = no limit, false = default, number = limit)
+
+  // Availability feature settings
+  availabilityFolder?: string; // Folder path for saving availability files
 }
 
 export const DEFAULT_SETTINGS: FullCalendarSettings = {
@@ -119,7 +122,10 @@ export const DEFAULT_SETTINGS: FullCalendarSettings = {
   slotMaxTime: '24:00', // Show all hours by default
   weekends: true, // Show weekends by default
   hiddenDays: [], // Show all days by default
-  dayMaxEvents: false // Use FullCalendar default behavior
+  dayMaxEvents: false, // Use FullCalendar default behavior
+
+  // Availability feature defaults
+  availabilityFolder: 'Shared availability' // Default folder for availability files
 };
 
 // Utility functions for workspace management

@@ -22,6 +22,7 @@ import { toEventInput } from './core/interop';
 import { manageTimezone } from './features/Timezone';
 import { Notice, Plugin, TFile, App } from 'obsidian';
 import { initializeI18n, t } from './features/i18n/i18n';
+import { DateTime } from 'luxon';
 
 // Heavy calendar classes are loaded lazily in the initializer map below
 import type { CalendarView } from './ui/view';
@@ -233,6 +234,37 @@ export default class FullCalendarPlugin extends Plugin {
       name: t('commands.openCalendar'),
       callback: () => {
         this.activateView();
+      }
+    });
+    this.addCommand({
+      id: 'full-calendar-share-availability',
+      name: t('commands.shareAvailability'),
+      callback: async () => {
+        try {
+          // Ensure cache is initialized
+          if (!this.cache.initialized) {
+            await this.cache.populate();
+          }
+
+          const { AvailabilityService } = await import('./features/availability/AvailabilityService');
+          const service = new AvailabilityService(this.app, this.settings);
+
+          // Calculate availability from tomorrow (today and past dates are irrelevant)
+          const now = DateTime.local();
+          const startDate = now.plus({ days: 1 }).startOf('day').toJSDate(); // Tomorrow
+          const endDate = now.plus({ days: 14 }).endOf('day').toJSDate(); // 2 weeks from tomorrow
+
+          // Get all event sources (for command, we use all sources, not filtered by workspace)
+          const allSources = this.cache.getAllEvents();
+
+          // Generate and save availability
+          const filePath = await service.generateAndSaveAvailability(allSources, startDate, endDate);
+
+          new Notice(`Availability saved to ${filePath}`);
+        } catch (err) {
+          console.error('Full Calendar: Failed to generate availability', err);
+          new Notice('Failed to generate availability. Please check the console.');
+        }
       }
     });
 
